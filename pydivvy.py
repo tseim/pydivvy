@@ -1,6 +1,7 @@
 from Tkinter import *
 import re
 import commands
+import subprocess
 
 
 def getWorkArea():
@@ -17,8 +18,9 @@ def getWorkArea():
 
 def kill_wmctrl():
     cmd = "killall wmctrl"
-    o = commands.getoutput(cmd)
-    print o
+    subprocess.Popen(cmd,shell=True)
+    #o = commands.getoutput(cmd)
+    #print o
 
 def placeWindow(x,y,w,h):
     cmd = "wmctrl -r :SELECT: -e 0,{x:d},{y:d},{w:d},{h:d}".format(x=x,y=y,w=w,h=h)
@@ -154,7 +156,7 @@ class App(Frame):
         
         print factor_h, factor_w
         print "x1={0}, y1={1}, x2={2}, y2={3}, width={4}, height={5}".format(self.x1,self.y1,self.x2,self.y2,width,height)
-        #placeWindow()
+        placeWindow(int(self.x1*factor_w), int(self.y1*factor_h), int(width*factor_w), int(height*factor_h))
 
     def rightClick(self,event):
         kill_wmctrl()
