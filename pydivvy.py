@@ -3,6 +3,17 @@ import re
 import commands
 
 
+def getWorkArea():
+    """ Return workarea geometry of current desktop
+        (this means the area without panels)
+
+        Use 2-tuple (x, y)
+    """
+    for line in commands.getoutput("wmctrl -d").split("\n"):
+        if '*' in line: # '*' marks current desktop
+            break
+    geometry = line.split(None, 9)[8]
+    return tuple(map(int, geometry.split('x')))
 
 def kill_wmctrl():
     cmd = "killall wmctrl"
@@ -55,19 +66,19 @@ class App(Frame):
         self.width = width
         self.height = height
 
-        self.app_x = self.app_y = self.app_width = self.app_height = 0
+        self.x1 = self.y1 = self.x2 = self.y2 = 0
         
         if (master is not None):
             self.master.title("Selector")
             self.master.resizable(False,False)
-            self.master.maxsize(width, height)
-            self.master.minsize(width, height)
+            self.master.maxsize(self.width, self.height)
+            self.master.minsize(self.width, self.height)
 
         self.pack()
         self.createWidgets()
         self.drawGrid();
         self.centerWindow()
-        self.master.overrideredirect(False)
+        #self.master.overrideredirect(False)
 
     def drawGrid(self):
         ranges = splitCeil(range(self.width), self.cols)
@@ -77,6 +88,8 @@ class App(Frame):
         ranges = splitCeil(range(self.height),self.rows)
         for r in ranges:
             self.canvas.create_line(0,r[0],self.width,r[0], fill="red")
+
+
 
     def centerWindow(self):
         ws = self.master.winfo_screenwidth()
@@ -89,7 +102,8 @@ class App(Frame):
 
 
     def createWidgets(self):
-        self.canvas = Canvas(self)
+        self.canvas = Canvas(self, width=self.width, height=self.height)
+        
         self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
         self.canvas.pack(side=LEFT)
         self.canvas.bind("<Button-1>", self.updateXY)
@@ -131,13 +145,15 @@ class App(Frame):
         self.canvas.create_rectangle((self.x1, self.y1, self.x2, self.y2), width=2)
 
     def doneStroke(self, event):
-        disp_w,disp_h,xoff,yoff = parseGeometry(self.master.geometry())
+        #disp_w,disp_h,xoff,yoff = parseGeometry(self.master.geometry())
+
+        width, height = self.x2-self.x1+1, self.y2-self.y1+1
+        disp_w,disp_h = getWorkArea()
+        factor_w = float(disp_w)/self.width
+        factor_h = float(disp_h)/self.height
         
-        x = int(round(self.width/(self.app_x+1)))
-        y = int(round(self.height/(self.app_y+1)))
-        print self.width, self.app_x+1, x
-        print self.height, self.app_y+1, y
-        print " "
+        print factor_h, factor_w
+        print "x1={0}, y1={1}, x2={2}, y2={3}, width={4}, height={5}".format(self.x1,self.y1,self.x2,self.y2,width,height)
         #placeWindow()
 
     def rightClick(self,event):
@@ -146,5 +162,7 @@ class App(Frame):
 
 
 root = Tk()
-myapp = App(master=root)
+#root.columnconfigure(0, weight=1)
+#root.rowconfigure(0, weight=1)
+myapp = App(master=root, width=800, height=600)
 myapp.mainloop()
