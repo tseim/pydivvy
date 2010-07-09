@@ -1,5 +1,19 @@
 from Tkinter import *
 import re
+import commands
+
+
+
+def kill_wmctrl():
+    cmd = "killall wmctrl"
+    o = commands.getoutput(cmd)
+    print o
+
+def placeWindow(x,y,w,h):
+    cmd = "wmctrl -r :SELECT: -e 0,{x:d},{y:d},{w:d},{h:d}".format(x=x,y=y,w=w,h=h)
+    o = commands.getoutput(cmd)
+    print o
+
     
 def splitCeil(seq, m):
     """Distribute the seq elements in lists in m groups
@@ -14,11 +28,15 @@ def splitCeil(seq, m):
         newseq.append(seq[a:b])
     return newseq
 
-def getMinMax(val, seq, g):
-    mini = maxi = 0
-    for seq in splitCeil(range(seq),g):
-        if val in seq:
-            return seq[0], seq[-1]
+
+def getBlockBounds(val, end, num_blocks):
+    seq=range(end)
+    n,b,newseq=len(seq),0,[]
+    for k in range(num_blocks):
+        q,r=divmod(n-k,num_blocks)
+        a,b=b,b+q+(r!=0)
+        if val in seq[a:b]:
+            return seq[a], seq[b-1]
 
 def parseGeometry(geometry):
     m = re.match("(\d+)x(\d+)([-+]\d+)([-+]\d+)", geometry)
@@ -27,14 +45,17 @@ def parseGeometry(geometry):
     return map(int, m.groups())
 
 
-
 class App(Frame):
     def __init__(self, master=None, width=300, height=200, rows=6, cols=10):
         Frame.__init__(self, master)
 
-        self.lastx = self.lasty = 0
+        self.lastcoords = []
         self.rows = rows
         self.cols = cols
+        self.width = width
+        self.height = height
+
+        self.app_x = self.app_y = self.app_width = self.app_height = 0
         
         if (master is not None):
             self.master.title("Selector")
@@ -44,14 +65,24 @@ class App(Frame):
 
         self.pack()
         self.createWidgets()
-        self.center_window(width, height)
+        self.drawGrid();
+        self.centerWindow()
         self.master.overrideredirect(False)
 
-    def center_window(self, w, h):
-        # get screen width and height
+    def drawGrid(self):
+        ranges = splitCeil(range(self.width), self.cols)
+        for r in ranges:
+            self.canvas.create_line(r[0],0,r[0],self.height, fill="red")
+
+        ranges = splitCeil(range(self.height),self.rows)
+        for r in ranges:
+            self.canvas.create_line(0,r[0],self.width,r[0], fill="red")
+
+    def centerWindow(self):
         ws = self.master.winfo_screenwidth()
         hs = self.master.winfo_screenheight()
-        # calculate position x, y
+
+        w, h = self.width, self.height
         x = (ws/2) - (w/2) 
         y = (hs/2) - (h/2)
         self.master.geometry('%dx%d+%d+%d' % (w, h, x, y))
@@ -64,48 +95,56 @@ class App(Frame):
         self.canvas.bind("<Button-1>", self.updateXY)
         self.canvas.bind("<B1-Motion>", self.drawRect)
         self.canvas.bind("<B1-ButtonRelease>", self.doneStroke)
-        self.canvas.bind("<Button-3>", quit)
+        self.canvas.bind("<Button-3>", self.rightClick)
 
     
 
     def getCoords(self, x, y):
         w,h,xoff,yoff = parseGeometry(self.master.geometry());
-        rx = getMinMax(x, w, self.cols)
-        ry = getMinMax(y, h, self.rows)
+        rx = getBlockBounds(x, w, self.cols)
+        ry = getBlockBounds(y, h, self.rows)
         return rx,ry
 
 
-#------------ callbacks-------------------
+    #------------ callbacks-------------------
     def updateXY(self, event):
-        self.lastx, self.lasty = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        crds = self.getCoords(event.x,event.y)
-        self.lastx = crds[0][0]
-        self.lasty = crds[1][0]
+        lastx, lasty = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        crds = self.getCoords(lastx,lasty)
+        self.lastcoords = crds
 
     def drawRect(self, event):
         x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         self.canvas.delete(ALL)
-        #print x,y
-        crds= self.getCoords(x,y);
-        x,y = crds[0][1], crds[1][1] 
-        self.canvas.create_rectangle((self.lastx, self.lasty, x, y))#, tags='currentline')
+        self.drawGrid()
+        newcoords= self.getCoords(x,y);
+        lastcoords= self.lastcoords
+        x1 = min(newcoords[0][0], newcoords[0][1], lastcoords[0][0], lastcoords[0][1])
+        y1 = min(newcoords[1][1], newcoords[1][0], lastcoords[1][1], lastcoords[1][0])
+        x2 = max(newcoords[0][0], newcoords[0][1], lastcoords[0][0], lastcoords[0][1])
+        y2 = max(newcoords[1][1], newcoords[1][0], lastcoords[1][1], lastcoords[1][0])
+
+        self.x1 = min(x1,x2)
+        self.y1 = min(y1,y2)
+        self.x2 = max(x2,x1)
+        self.y2 = max(y2,y1)
+        
+        self.canvas.create_rectangle((self.x1, self.y1, self.x2, self.y2), width=2)
 
     def doneStroke(self, event):
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        self.canvas.delete(ALL)
-        crds= self.getCoords(x,y);
-        x,y = crds[0][1], crds[1][1]
-        self.canvas.create_rectangle((self.lastx, self.lasty, x, y))#, tags='currentline')
-        self.lastx, self.lasty = x, y
+        disp_w,disp_h,xoff,yoff = parseGeometry(self.master.geometry())
+        
+        x = int(round(self.width/(self.app_x+1)))
+        y = int(round(self.height/(self.app_y+1)))
+        print self.width, self.app_x+1, x
+        print self.height, self.app_y+1, y
+        print " "
+        #placeWindow()
+
+    def rightClick(self,event):
+        kill_wmctrl()
 
 
 
 root = Tk()
-
 myapp = App(master=root)
-
-def quit():
-    root.quit()
-
 myapp.mainloop()
-#root.destroy()
