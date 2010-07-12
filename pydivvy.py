@@ -104,7 +104,8 @@ class App(Frame):
 
 
     def createWidgets(self):
-        self.canvas = Canvas(self, width=self.width, height=self.height, bg="black")
+        self.master.wm_attributes("-alpha", 0.3)
+        self.canvas = Canvas(self, width=self.width, height=self.height)#, bg="black")
         
         self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
         self.canvas.pack(side=LEFT)
@@ -153,33 +154,45 @@ class App(Frame):
         self.canvas.create_rectangle((self.x1, self.y1, self.x2, self.y2), width=2, outline="red")
 
     def doneStroke(self, event):
-        #disp_w,disp_h,xoff,yoff = parseGeometry(self.master.geometry())
         x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        col = [i for (i, rng) in enumerate(splitCeil(range(self.width), self.cols)) if x in rng][0]
-        row = [i for (i, rng) in enumerate(splitCeil(range(self.height), self.rows)) if y in rng][0]
+        current_col = [i for (i, rng) in enumerate(splitCeil(range(self.width), self.cols)) if x in rng][0]
+        current_row = [i for (i, rng) in enumerate(splitCeil(range(self.height), self.rows)) if y in rng][0]
+
+        prev_col, prev_row = self.lastcell[0], self.lastcell[1]
         
-
-        #width, height = self.x2-self.x1+1, self.y2-self.y1+1
-
         disp_w_total, disp_h_total = getWorkArea()
         ranges_w = splitCeil(range(disp_w_total), self.cols)
         ranges_h = splitCeil(range(disp_h_total), self.rows)
         
-        disp_x = ranges_w[self.lastcell[0]][0]
-        disp_y = ranges_h[self.lastcell[1]][0]
+        disp_x = min(ranges_w[prev_col][0], \
+                     ranges_w[prev_col][-1], \
+                     ranges_w[current_col][0], \
+                     ranges_w[current_col][-1])
+        disp_y = min(ranges_h[prev_row][0], \
+                     ranges_h[prev_row][-1], \
+                     ranges_h[current_row][0], \
+                     ranges_h[current_row][-1])
 
-        disp_x2 = ranges_w[col][-1]
-        disp_y2 = ranges_h[row][-1]
+        disp_x2 = max(ranges_w[prev_col][0],\
+                      ranges_w[prev_col][-1],\
+                      ranges_w[current_col][0],\
+                      ranges_w[current_col][-1])
+        disp_y2 = max(ranges_h[prev_row][0],\
+                      ranges_h[prev_row][-1],\
+                      ranges_h[current_row][0],\
+                      ranges_h[current_row][-1])
         
         width  = disp_x2 - disp_x
         height = disp_y2 - disp_y
 
-        print disp_x, disp_y, width, height
+        print disp_x, disp_y, disp_x2, disp_y2, width, height
         
         placeWindow(disp_x, \
                     disp_y, \
                     width, \
                     height)
+
+        
 
     def rightClick(self,event):
         kill_wmctrl()
