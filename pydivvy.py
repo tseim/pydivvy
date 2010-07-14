@@ -6,6 +6,17 @@ def placeWindow(x,y,w,h):
     o = commands.getoutput(cmd)
     print o
 
+def getWorkArea():
+   """ Return workarea geometry of current desktop
+       (this means the area without panels)
+
+       Use 2-tuple (x, y)
+   """
+   for line in commands.getoutput('wmctrl -d').split('\n'):
+       if '*' in line: # '*' marks current desktop
+           break
+   geometry = line.split(None, 9)[8]
+   return tuple(map(int, geometry.split('x')))
     
 def splitCeil(seq, m):
     """Distribute the seq elements in lists in m groups
@@ -32,8 +43,8 @@ class App(Frame):
         self.height = height
         self.lastcol= 0
         self.lastrow = 0
-        self.screenwidth = self.master.winfo_screenwidth()
-        self.screenheight = self.master.winfo_screenheight()
+        self.screenwidth = getWorkArea()[0] #self.master.winfo_screenwidth()
+        self.screenheight = getWorkArea()[1]#self.master.winfo_screenheight()
         self.screen_width_ranges = splitCeil(range(self.screenwidth), cols)
         self.screen_height_ranges = splitCeil(range(self.screenheight), rows)
         self.window_width_ranges = splitCeil(range(width), cols)
