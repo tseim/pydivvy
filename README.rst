@@ -12,7 +12,11 @@ Under the hood, pydivvy uses wmctrl_, so it should work with any EWMH compatible
  TODO:
 =======
 
-Implement a way to skip certain areas of the screen to avoid overlapping panels.  
+- keep pydivvy gui always on top (via wmctrl)
+- pay attention to window decorations
+- use a config file
+- clean up code
+
 
 .. _Divvy: http://www.mizage.com/divvy/
 .. _wmctrl: http://tomas.styblo.name/wmctrl/
