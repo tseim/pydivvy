@@ -136,7 +136,7 @@ class App(Frame):
         self.canvas.bind("<Escape>", self.quit)
         
 
-    def getAreaDict(self, curr_x, curr_y, ranges_x, ranges_y):
+    def getAreaCoordinates(self, curr_x, curr_y, ranges_x, ranges_y):
         current_col = [i for (i, rng) in enumerate(self.window_width_ranges) if curr_x in rng][0]
         current_row = [i for (i, rng) in enumerate(self.window_height_ranges) if curr_y in rng][0]
 
@@ -165,7 +165,7 @@ class App(Frame):
                       ranges_h[current_row][0],\
                       ranges_h[current_row][-1])
 
-        return dict(min_x=disp_x, max_x=disp_x2, min_y=disp_y, max_y=disp_y2)        
+        return disp_x, disp_x2, disp_y, disp_y2     
 
     #------------ callbacks-------------------
     def quit(self, event):
@@ -187,9 +187,9 @@ class App(Frame):
         
         x = 0 if x < 0 else min(x, self.width - 1) 
         y = 0 if y < 0 else min(y, self.height - 1)
-        
-        d = self.getAreaDict(x, y, self.window_width_ranges, self.window_height_ranges)
-        x1, x2, y1, y2 = d["min_x"], d["max_x"], d["min_y"], d["max_y"]
+                
+        d = self.getAreaCoordinates(x, y, self.window_width_ranges, self.window_height_ranges)
+        x1, x2, y1, y2 = d
 
         self.canvas.create_rectangle((x1, y1, x2, y2),\
                                      width=2,\
@@ -198,9 +198,11 @@ class App(Frame):
 
     def doneStroke(self, event):
         x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        x = 0 if x < 0 else min(x, self.width - 1) 
+        y = 0 if y < 0 else min(y, self.height - 1)
 
-        d = self.getAreaDict(x, y, self.screen_width_ranges, self.screen_height_ranges)
-        disp_x, disp_x2, disp_y, disp_y2 = d["min_x"], d["max_x"], d["min_y"], d["max_y"]
+        d = self.getAreaCoordinates(x, y, self.screen_width_ranges, self.screen_height_ranges)
+        disp_x, disp_x2, disp_y, disp_y2 = d
         
         width  = disp_x2 - disp_x
         height = disp_y2 - disp_y
