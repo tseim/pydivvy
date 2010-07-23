@@ -1,10 +1,41 @@
 from Tkinter import *
 import commands
+import os
+import ConfigParser
+import logging
+
+PROGRAM_NAME = "pydivvy"
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger()
+log.name = PROGRAM_NAME
+
+def initconfig():
+    rcfile = os.getenv("HOME") + "/.pydivvyrc"
+    
+    defaults = {
+        'WindowWidth': 800,
+        'WindowHeight' : 600,
+        'Columns' : 8,
+        'Rows' : 6,
+        'GridColor' : 'DarkGrey',
+        'SelectionColor' : 'red',
+        'BackgroundColor' : '#303030'}
+    config = ConfigParser.RawConfigParser(defaults)
+
+    if not os.path.exists(rcfile):
+        with open(rcfile, 'w') as f:
+            config.write(f)
+
+    config.read(rcfile)
+    return config
+        
 
 def placeWindow(x,y,w,h):
     cmd = "wmctrl -r :SELECT: -e 0,{x:d},{y:d},{w:d},{h:d}".format(x=x,y=y,w=w,h=h)
-    o = commands.getoutput(cmd)
-    print o
+    log.debug("Placing window: " + cmd)
+    commands.getoutput(cmd)
+    
 
 def getWorkArea():
    """ Return workarea geometry of current desktop
@@ -34,27 +65,25 @@ def splitCeil(seq, m):
 
 
 class App(Frame):
-    def __init__(self, master=None, width=300, height=200, rows=6, cols=10):
+    def __init__(self, master=None):
         Frame.__init__(self, master)
+        
+        
+        self.initialize()
 
-        self.rows = rows
-        self.cols = cols
-        self.width = width
-        self.height = height
         self.lastcol= 0
         self.lastrow = 0
-        self.screenwidth = getWorkArea()[0] #self.master.winfo_screenwidth()
-        self.screenheight = getWorkArea()[1]#self.master.winfo_screenheight()
-        self.screen_width_ranges = splitCeil(range(self.screenwidth), cols)
-        self.screen_height_ranges = splitCeil(range(self.screenheight), rows)
-        self.window_width_ranges = splitCeil(range(width), cols)
-        self.window_height_ranges = splitCeil(range(height), rows)
+        self.screenwidth = getWorkArea()[0]
+        self.screenheight = getWorkArea()[1]
+        self.screen_width_ranges = splitCeil(range(self.screenwidth), self.cols)
+        self.screen_height_ranges = splitCeil(range(self.screenheight), self.rows)
+        self.window_width_ranges = splitCeil(range(self.width), self.cols)
+        self.window_height_ranges = splitCeil(range(self.height), self.rows)
 
-        self.gridColor = "DarkGrey"
-        self.selectionColor = "red"
-
+        
         if (master is not None):
-            self.master.title("pydivvy")
+            self.master.title(PROGRAM_NAME)
+            self.master.bind("<Escape>", lambda e: self.master.quit())
             self.master.resizable(False,False)
             self.master.maxsize(self.width, self.height)
             self.master.minsize(self.width, self.height)
@@ -63,14 +92,25 @@ class App(Frame):
         self.createWidgets()
         self.drawGrid();
         self.centerWindow()
+
+    def initialize(self):
+        config = initconfig()
+        section = "DEFAULT"
+        self.cols = config.getint(section, 'Columns')
+        self.rows = config.getint(section, 'Rows')
+        self.gridcolor = config.get(section, 'GridColor')
+        self.selectioncolor = config.get(section, 'SelectionColor')
+        self.width = config.getint(section, 'WindowWidth')
+        self.height = config.getint(section, 'WindowHeight')
+        self.backgroundcolor = config.get(section, 'BackgroundColor')
        
 
     def drawGrid(self):
         for r in self.window_width_ranges:
-            self.canvas.create_line(r[0], 0, r[0], self.height, fill=self.gridColor)
+            self.canvas.create_line(r[0], 0, r[0], self.height, fill=self.gridcolor)
 
         for r in self.window_height_ranges:
-            self.canvas.create_line(0, r[0], self.width, r[0], fill=self.gridColor)
+            self.canvas.create_line(0, r[0], self.width, r[0], fill=self.gridcolor)
 
 
 
@@ -86,13 +126,15 @@ class App(Frame):
 
     def createWidgets(self):
         self.master.wm_attributes("-alpha", 0.3) #doesnt work.
-        self.canvas = Canvas(self, width=self.width, height=self.height)
+        self.canvas = Canvas(self, width=self.width, height=self.height, bg=self.backgroundcolor)
         
         self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
         self.canvas.pack(side=LEFT)
         self.canvas.bind("<Button-1>", self.setLastCell)
         self.canvas.bind("<B1-Motion>", self.drawRect)
         self.canvas.bind("<B1-ButtonRelease>", self.doneStroke)
+        self.canvas.bind("<Escape>", self.quit)
+        
 
     def getAreaDict(self, curr_x, curr_y, ranges_x, ranges_y):
         current_col = [i for (i, rng) in enumerate(self.window_width_ranges) if curr_x in rng][0]
@@ -126,6 +168,9 @@ class App(Frame):
         return dict(min_x=disp_x, max_x=disp_x2, min_y=disp_y, max_y=disp_y2)        
 
     #------------ callbacks-------------------
+    def quit(self, event):
+        Frame.quit(self)
+
     def setLastCell(self, event):
         lastx, lasty = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
 
@@ -139,13 +184,16 @@ class App(Frame):
         x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         self.canvas.delete(ALL)
         self.drawGrid()
-
+        
+        x = 0 if x < 0 else min(x, self.width - 1) 
+        y = 0 if y < 0 else min(y, self.height - 1)
+        
         d = self.getAreaDict(x, y, self.window_width_ranges, self.window_height_ranges)
         x1, x2, y1, y2 = d["min_x"], d["max_x"], d["min_y"], d["max_y"]
 
         self.canvas.create_rectangle((x1, y1, x2, y2),\
                                      width=2,\
-                                     outline=self.selectionColor)
+                                     outline=self.selectioncolor)
 
 
     def doneStroke(self, event):
@@ -161,5 +209,5 @@ class App(Frame):
 
      
 root = Tk()
-myapp = App(master=root, width=800, height=600, rows=6, cols=6)
+myapp = App(master=root)
 myapp.mainloop()
