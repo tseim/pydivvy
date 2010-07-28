@@ -9,12 +9,6 @@ pydivvy is inspired by an app for Macs: Divvy_.
 Under the hood, pydivvy uses wmctrl_, so it should work with any EWMH compatible Window Manager. Please refer to wmctrl's homepage for more information.
 
 
-TODO:
-=====
-
-- pay attention to window decorations
-- clean up code
-
 
 .. _Divvy: http://www.mizage.com/divvy/
 .. _wmctrl: http://tomas.styblo.name/wmctrl/

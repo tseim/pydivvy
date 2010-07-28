@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger()
 log.name = PROGRAM_NAME
 
-def initconfig():
+def init_config():
     rcfile = os.getenv("HOME") + "/.pydivvyrc"
     
     defaults = {
@@ -20,7 +20,8 @@ def initconfig():
         'Rows' : 6,
         'GridColor' : 'DarkGrey',
         'SelectionColor' : 'red',
-        'BackgroundColor' : '#303030'}
+        'BackgroundColor' : '#303030',
+        'DecorationHeight': 15}
     config = ConfigParser.RawConfigParser(defaults)
 
     if not os.path.exists(rcfile):
@@ -31,13 +32,16 @@ def initconfig():
     return config
         
 
-def placeWindow(x,y,w,h):
-    cmd = "wmctrl -r :SELECT: -e 0,{x:d},{y:d},{w:d},{h:d}".format(x=x,y=y,w=w,h=h)
+def place_window(x, y, w, h, skip):
+    """ Runs wmctrl using the given dimensions as parameter.
+        The user has to select a window to apply the changes.
+    """
+    cmd = "wmctrl -r :SELECT: -e 0,{x:d},{y:d},{w:d},{h:d}".format(x=x,y=y,w=w,h=h-skip)
     log.debug("Placing window: " + cmd)
     commands.getoutput(cmd)
     
 
-def getWorkArea():
+def get_work_area():
    """ Return workarea geometry of current desktop
        (this means the area without panels)
 
@@ -49,16 +53,16 @@ def getWorkArea():
    geometry = line.split(None, 9)[8]
    return tuple(map(int, geometry.split('x')))
     
-def splitCeil(seq, m):
+def split_ceil(seq, m):
     """Distribute the seq elements in lists in m groups
        according to quasi equitative distribution (decreasing order):
-         splitCeil(range(13), 4) --> seq = range(13), m=4
+         split_ceil(range(13), 4) --> seq = range(13), m=4
          result : [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
     """
-    n,b,newseq=len(seq),0,[]
+    n,b,newseq = len(seq),0,[]
     for k in range(m):
-        q,r=divmod(n-k,m)
-        a, b = b, b + q + (r!=0)
+        q, r = divmod(n - k, m)
+        a, b = b, b + q + (r != 0)
         newseq.append(seq[a:b])
     return newseq
 
@@ -67,34 +71,29 @@ def splitCeil(seq, m):
 class App(Frame):
     def __init__(self, master=None):
         Frame.__init__(self, master)
-        
-        
+
         self.initialize()
 
-        self.lastcol= 0
-        self.lastrow = 0
-        self.screenwidth = getWorkArea()[0]
-        self.screenheight = getWorkArea()[1]
-        self.screen_width_ranges = splitCeil(range(self.screenwidth), self.cols)
-        self.screen_height_ranges = splitCeil(range(self.screenheight), self.rows)
-        self.window_width_ranges = splitCeil(range(self.width), self.cols)
-        self.window_height_ranges = splitCeil(range(self.height), self.rows)
+        self.lastcol = self.lastrow = 0
+        self.screenwidth, self.screenheight = get_work_area()
+        self.screen_width_ranges = split_ceil(range(self.screenwidth), self.cols)
+        self.screen_height_ranges = split_ceil(range(self.screenheight), self.rows)
+        self.window_width_ranges = split_ceil(range(self.width), self.cols)
+        self.window_height_ranges = split_ceil(range(self.height), self.rows)
 
-        
-        if (master is not None):
-            self.master.title(PROGRAM_NAME)
-            self.master.bind("<Escape>", lambda e: self.master.quit())
-            self.master.resizable(False,False)
-            self.master.maxsize(self.width, self.height)
-            self.master.minsize(self.width, self.height)
+        self.master.title(PROGRAM_NAME)
+        self.master.bind("<Escape>", lambda e: self.master.quit())
+        self.master.resizable(False,False)
+        self.master.maxsize(self.width, self.height)
+        self.master.minsize(self.width, self.height)
 
         self.pack()
-        self.createWidgets()
-        self.drawGrid();
-        self.centerWindow()
+        self.create_widgets()
+        self.draw_grid();
+        self.center_window()
 
     def initialize(self):
-        config = initconfig()
+        config = init_config()
         section = "DEFAULT"
         self.cols = config.getint(section, 'Columns')
         self.rows = config.getint(section, 'Rows')
@@ -103,9 +102,10 @@ class App(Frame):
         self.width = config.getint(section, 'WindowWidth')
         self.height = config.getint(section, 'WindowHeight')
         self.backgroundcolor = config.get(section, 'BackgroundColor')
-       
+        self.decoration_height = config.getint(section, 'DecorationHeight')
 
-    def drawGrid(self):
+
+    def draw_grid(self):
         for r in self.window_width_ranges:
             self.canvas.create_line(r[0], 0, r[0], self.height, fill=self.gridcolor)
 
@@ -113,8 +113,7 @@ class App(Frame):
             self.canvas.create_line(0, r[0], self.width, r[0], fill=self.gridcolor)
 
 
-
-    def centerWindow(self):
+    def center_window(self):
         ws = self.screenwidth
         hs = self.screenheight
 
@@ -124,26 +123,23 @@ class App(Frame):
         self.master.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
 
-    def createWidgets(self):
+    def create_widgets(self):
         self.master.wm_attributes("-alpha", 0.3) #doesnt work.
         self.canvas = Canvas(self, width=self.width, height=self.height, bg=self.backgroundcolor)
         
         self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
         self.canvas.pack(side=LEFT)
-        self.canvas.bind("<Button-1>", self.setLastCell)
-        self.canvas.bind("<B1-Motion>", self.drawRect)
-        self.canvas.bind("<B1-ButtonRelease>", self.doneStroke)
+        self.canvas.bind("<Button-1>", self.set_last_cell)
+        self.canvas.bind("<B1-Motion>", self.draw_rectangle)
+        self.canvas.bind("<B1-ButtonRelease>", self.done_stroke)
         self.canvas.bind("<Escape>", self.quit)
-        
 
-    def getAreaCoordinates(self, curr_x, curr_y, ranges_x, ranges_y):
+
+    def get_area_coordinates(self, curr_x, curr_y, ranges_w, ranges_h):
         current_col = [i for (i, rng) in enumerate(self.window_width_ranges) if curr_x in rng][0]
         current_row = [i for (i, rng) in enumerate(self.window_height_ranges) if curr_y in rng][0]
 
         prev_col, prev_row = self.lastcol, self.lastrow
-        
-        ranges_w = ranges_x
-        ranges_h = ranges_y
         
         disp_x = min(ranges_w[prev_col][0], \
                      ranges_w[prev_col][-1], \
@@ -167,11 +163,12 @@ class App(Frame):
 
         return disp_x, disp_x2, disp_y, disp_y2     
 
-    #------------ callbacks-------------------
+
     def quit(self, event):
         Frame.quit(self)
 
-    def setLastCell(self, event):
+
+    def set_last_cell(self, event):
         lastx, lasty = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
 
         col = [i for (i, rng) in enumerate(self.window_width_ranges) if lastx in rng][0]
@@ -180,36 +177,37 @@ class App(Frame):
         self.lastcol, self.lastrow = col, row
 
 
-    def drawRect(self, event):
-        x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        self.canvas.delete(ALL)
-        self.drawGrid()
-        
+    def limit_cursor_position(self, event_x, event_y):
+        x, y = self.canvas.canvasx(event_x), self.canvas.canvasy(event_y)
         x = 0 if x < 0 else min(x, self.width - 1) 
         y = 0 if y < 0 else min(y, self.height - 1)
-                
-        d = self.getAreaCoordinates(x, y, self.window_width_ranges, self.window_height_ranges)
-        x1, x2, y1, y2 = d
+        return x, y
+        
+        
+    def draw_rectangle(self, event):
+        x, y = self.limit_cursor_position(event.x, event.y)
+
+        self.canvas.delete(ALL)
+        self.draw_grid()
+        
+        x1, x2, y1, y2 = self.get_area_coordinates(x, y, self.window_width_ranges, self.window_height_ranges)
 
         self.canvas.create_rectangle((x1, y1, x2, y2),\
                                      width=2,\
                                      outline=self.selectioncolor)
 
 
-    def doneStroke(self, event):
-        x,y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
-        x = 0 if x < 0 else min(x, self.width - 1) 
-        y = 0 if y < 0 else min(y, self.height - 1)
+    def done_stroke(self, event):
+        x, y = self.limit_cursor_position(event.x, event.y)
 
-        d = self.getAreaCoordinates(x, y, self.screen_width_ranges, self.screen_height_ranges)
-        disp_x, disp_x2, disp_y, disp_y2 = d
+        x1, x2, y1, y2 = self.get_area_coordinates(x, y, self.screen_width_ranges, self.screen_height_ranges)
         
-        width  = disp_x2 - disp_x
-        height = disp_y2 - disp_y
+        width  = x2 - x1
+        height = y2 - y1
         
-        placeWindow(disp_x, disp_y, width, height)
+        place_window(x1, y1, width, height, self.decoration_height)
 
      
 root = Tk()
-myapp = App(master=root)
-myapp.mainloop()
+pydivvy = App(master=root)
+pydivvy.mainloop()
