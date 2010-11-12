@@ -49,9 +49,11 @@ def get_work_area():
    """
    for line in commands.getoutput('wmctrl -d').split('\n'):
        if '*' in line: # '*' marks current desktop
-           break
-   geometry = line.split(None, 9)[8]
-   return tuple(map(int, geometry.split('x')))
+           geometry = line.split(None, 9)
+           min_x, min_y = geometry[7].split(',')
+           max_x, max_y = geometry[8].split('x')
+   
+   return int(min_x), int(min_y), int(max_x), int(max_y) 
     
 def split_ceil(seq, m):
     """Distribute the seq elements in lists in m groups
@@ -75,9 +77,9 @@ class App(Frame):
         self.initialize()
 
         self.lastcol = self.lastrow = 0
-        self.screenwidth, self.screenheight = get_work_area()
-        self.screen_width_ranges = split_ceil(range(self.screenwidth), self.cols)
-        self.screen_height_ranges = split_ceil(range(self.screenheight), self.rows)
+        self.min_x, self.min_y, self.screenwidth, self.screenheight = get_work_area()
+        self.screen_width_ranges = split_ceil(range(self.min_x, self.screenwidth), self.cols)
+        self.screen_height_ranges = split_ceil(range(self.min_y, self.screenheight), self.rows)
         self.window_width_ranges = split_ceil(range(self.width), self.cols)
         self.window_height_ranges = split_ceil(range(self.height), self.rows)
 
@@ -194,7 +196,8 @@ class App(Frame):
 
         self.canvas.create_rectangle((x1, y1, x2, y2),\
                                      width=2,\
-                                     outline=self.selectioncolor)
+                                     outline=self.selectioncolor, \
+                                     fill='')
 
 
     def done_stroke(self, event):
